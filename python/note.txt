@@ -1,0 +1,17 @@
+func (s *Scanner) extractMultiLineComment() Token {
+	startPosition := s.Position - 1
+	startLine := s.Line
+	startCol := s.Col - 1
+
+	for s.Position < len(s.InputString)-1 && s.InputString[s.Position:s.Position+2] != "*/" {
+		s.updatePos()
+	}
+	if s.Position == len(s.InputString)-1 {
+		panic("多行注释出现错误")
+	}
+	// 进行转义处理
+	value := strings.ReplaceAll(s.InputString[startPosition:s.Position], "\n", "\\n")
+	s.Position += 2
+	pos := Pos{Offset: startPosition, Line: startLine, Col: startCol}
+	return Token{TokenType: COMMENT, Value: value + "*/", Pos: pos}
+}
