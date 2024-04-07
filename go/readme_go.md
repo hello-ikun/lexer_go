@@ -1,10 +1,39 @@
-package token
+# GO语言词法分析器
+>使用go和python分别实现
 
-import (
-	"fmt"
-	"strings"
+## Go部分
+>已经写完了,可能存在部分未知问题 | 简单做一个描述
+### Token和Pos结构
+```go
+# 定义 token 类型
+// TokenType是Go编程语言的词法标记集合。
+type TokenType int
+
+// 标记列表。
+const (
+	// 特殊标记
+	ILLEGAL TokenType = iota
+	EOF
+	COMMENT
+
+	// 标识符和基本类型字面量（这些标记代表字面量的类别）
+	//此处省略
 )
+```
+```go
+// Pos 类型定义，用于存储位置信息
+type Pos struct {
+	Offset int
+	Line   int
+	Col    int
+}
 
+func (pos Pos) String() string {
+	return fmt.Sprintf("%d:%d:%d", pos.Offset, pos.Line, pos.Col)
+}
+```
+### Scanner结构|主要部分
+```go
 // Token 类型定义
 type Token struct {
 	TokenType TokenType
@@ -19,77 +48,29 @@ type Scanner struct {
 	Line        int
 	Col         int
 }
+```
+>第一步:提取标识符
+```go
+// 提取标识符
+func (s *Scanner) extractIdentifier() Token {
+	startPosition := s.Position
+	startLine := s.Line
+	startCol := s.Col
 
-// 构造函数
-func NewScanner(inputString string) *Scanner {
-	return &Scanner{
-		InputString: inputString,
-		Position:    0,
-		Line:        1,
-		Col:         1,
-	}
-}
-
-// 词法分析函数
-func (s *Scanner) Scan() []Token {
-	var tokens []Token
-
-	for s.Position < len(s.InputString) {
-		char := s.InputString[s.Position]
-
-		if char == ' ' || char == '\t' || char == '\r' {
-			s.updatePos()
-		} else if char == '\n' {
-			s.updatePos()
-		} else if char == '"' || char == '`' || char == '\'' {
-			tokens = append(tokens, s.extractStringAndByte())
-		} else if s.isAlpha(char) || char == '_' {
-			token := s.extractIdentifier()
-			tokens = append(tokens, token)
-		} else if s.isDigit(char) || (char == '-' && s.isDigit(s.InputString[s.Position+1])) {
-			tokens = append(tokens, s.extractNumber())
-		} else if strings.Contains("+-*%=()&|^<>!.:;/{}|[]^<>\\,", string(char)) { // 包含字符
-			token := s.extractOperator()
-			tokens = append(tokens, token)
-		} else {
-			panic(fmt.Sprintf("错误/未知字符 '%c' 出现在 %d", char, s.Position))
-		}
+	for s.Position < len(s.InputString) && (s.isAlpha(s.InputString[s.Position]) || s.isDigit(s.InputString[s.Position]) || s.InputString[s.Position] == '_') {
+		s.updatePos()
 	}
 
-	return tokens
+	value := s.InputString[startPosition:s.Position]
+
+	tok := Lookup(value) // 检查是不是关键字
+	token := Token{TokenType: tok, Value: value, Pos: Pos{Offset: startPosition, Line: startLine, Col: startCol}}
+
+	return token
 }
-
-// 词法分析函数
-func (s *Scanner) FScan() {
-	// 输出标题
-	fmt.Printf("%-18s %-15s %s\n", "Position", "Type", "Value")
-	var tok Token
-	for s.Position < len(s.InputString) {
-		char := s.InputString[s.Position]
-
-		if char == ' ' || char == '\t' || char == '\r' {
-			s.updatePos()
-			continue
-		} else if char == '\n' {
-			s.updatePos()
-			continue
-		} else if char == '"' || char == '`' || char == '\'' {
-			tok = s.extractStringAndByte()
-		} else if s.isAlpha(char) || char == '_' {
-			tok = s.extractIdentifier()
-
-		} else if s.isDigit(char) {
-			tok = s.extractNumber()
-		} else if strings.Contains("+-*%=()&|^<>!.:;/{}|[]^<>\\,", string(char)) { // 包含字符
-			tok = s.extractOperator()
-		} else {
-			panic(fmt.Sprintf("错误/未知字符 '%c' 出现在 %d", char, s.Position))
-		}
-		fmt.Printf("%-6d:%-6d:%-6d %-15s %v\n", s.Position, tok.Pos.Line, tok.Pos.Col, tok.TokenType, tok.Value)
-	}
-
-}
-
+```
+>第二步:对于操作符/分割符号进行解析|注意这个符号有时候有歧义
+```go
 // 提取分割符号符
 func (s *Scanner) extractOperator() Token {
 	startPosition := s.Position
@@ -211,46 +192,9 @@ func (s *Scanner) extractOperator() Token {
 	tok := Lookup(value) // 检查是不是关键字
 	return Token{TokenType: tok, Value: operator, Pos: pos}
 }
-
-// 更新位置信息函数
-func (s *Scanner) updatePos() {
-	if s.InputString[s.Position] == '\n' {
-		s.Line++
-		s.Col = 1
-	} else {
-		s.Col++
-	}
-	s.Position++
-}
-
-// 判断字符是否为字母
-func (s *Scanner) isAlpha(char byte) bool {
-	return (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z')
-}
-
-// 判断字符是否为数字
-func (s *Scanner) isDigit(char byte) bool {
-	return char >= '0' && char <= '9'
-}
-
-// 提取标识符
-func (s *Scanner) extractIdentifier() Token {
-	startPosition := s.Position
-	startLine := s.Line
-	startCol := s.Col
-
-	for s.Position < len(s.InputString) && (s.isAlpha(s.InputString[s.Position]) || s.isDigit(s.InputString[s.Position]) || s.InputString[s.Position] == '_') {
-		s.updatePos()
-	}
-
-	value := s.InputString[startPosition:s.Position]
-
-	tok := Lookup(value) // 检查是不是关键字
-	token := Token{TokenType: tok, Value: value, Pos: Pos{Offset: startPosition, Line: startLine, Col: startCol}}
-
-	return token
-}
-
+```
+>第三步:解析数字|可以有一个更简单的做法(但我们不采用)
+```go
 // 提取数字
 func (s *Scanner) extractNumber() Token {
 	startPosition := s.Position
@@ -293,6 +237,9 @@ func (s *Scanner) extractNumber() Token {
 
 	return token
 }
+```
+>第四步:解析一下字符类型|`"'这三种 |注意转义处理
+```go
 func (s *Scanner) extractStringAndByte() Token {
 	Pre := s.InputString[s.Position]
 	StartLine := s.Line
@@ -329,7 +276,9 @@ func (s *Scanner) extractStringAndByte() Token {
 	value = strings.ReplaceAll(strings.TrimSpace(value), "\r\n", "\\n")
 	return Token{tokenType, value + string(Pre), Pos}
 }
-
+```
+> 第五步:解析注释信息 | 单行和多行注释
+```go
 // 提取单行注释
 func (s *Scanner) extractSingleLineComment() Token {
 	startPosition := s.Position - 1
@@ -364,25 +313,60 @@ func (s *Scanner) extractMultiLineComment() Token {
 	pos := Pos{Offset: startPosition, Line: startLine, Col: startCol}
 	return Token{TokenType: COMMENT, Value: value, Pos: pos}
 }
-
-// 测试函数
-func TestLexer(inputString string) {
-	scanner := NewScanner(inputString)
-	tokens := scanner.Scan()
-
-	// 输出标题
-	fmt.Printf("%-15s %-15s %s\n", "Position", "Type", "Value")
-
-	// 输出词法分析结果
-	for _, token := range tokens {
-		position := fmt.Sprintf("%d:%d", token.Pos.Line, token.Pos.Col)
-		fmt.Printf("%-15s %-15s %v\n", position, token.TokenType, token.Value)
+```
+>补充一下 我们需要更新位置信息以及辅助函数
+```go
+// 更新位置信息函数
+func (s *Scanner) updatePos() {
+	if s.InputString[s.Position] == '\n' {
+		s.Line++
+		s.Col = 1
+	} else {
+		s.Col++
 	}
+	s.Position++
 }
 
-// 测试函数
-func TestLexerFormat(inputString string) {
-	scanner := NewScanner(inputString)
-	scanner.FScan()
+// 判断字符是否为字母
+func (s *Scanner) isAlpha(char byte) bool {
+	return (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z')
+}
+
+// 判断字符是否为数字
+func (s *Scanner) isDigit(char byte) bool {
+	return char >= '0' && char <= '9'
+}
+```
+>最后来写调用scan函数
+```go
+// 词法分析函数
+func (s *Scanner) FScan() {
+	// 输出标题
+	fmt.Printf("%-18s %-15s %s\n", "Position", "Type", "Value")
+	var tok Token
+	for s.Position < len(s.InputString) {
+		char := s.InputString[s.Position]
+
+		if char == ' ' || char == '\t' || char == '\r' {
+			s.updatePos()
+			continue
+		} else if char == '\n' {
+			s.updatePos()
+			continue
+		} else if char == '"' || char == '`' || char == '\'' {
+			tok = s.extractStringAndByte()
+		} else if s.isAlpha(char) || char == '_' {
+			tok = s.extractIdentifier()
+
+		} else if s.isDigit(char) {
+			tok = s.extractNumber()
+		} else if strings.Contains("+-*%=()&|^<>!.:;/{}|[]^<>\\,", string(char)) { // 包含字符
+			tok = s.extractOperator()
+		} else {
+			panic(fmt.Sprintf("错误/未知字符 '%c' 出现在 %d", char, s.Position))
+		}
+		fmt.Printf("%-6d:%-6d:%-6d %-15s %v\n", s.Position, tok.Pos.Line, tok.Pos.Col, tok.TokenType, tok.Value)
+	}
 
 }
+```

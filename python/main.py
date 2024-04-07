@@ -273,6 +273,7 @@ class Scanner:
             
         self.update_pos()
         pos = Pos(start_position, start_line, start_col)
+        value = value.replace("\n",'\\n').strip()# 对于 \n进行转义处理
         return Token("BYTE" if pre == "'" else 'STRING', value+pre, pos)
 
     # 提取单行注释
@@ -301,7 +302,7 @@ class Scanner:
         pos = Pos(start_position, start_line,start_col)
         self.update_pos()
         self.update_pos()
-        value = self.input_string[start_position:self.position].replace("\n",'\\n').strip()
+        value = self.input_string[start_position:self.position].replace("\n",'\\n').replace("\r",'\\r').strip()
         return Token('COMMENT', value,pos)
     
 def test_lexer(input_string):
@@ -322,6 +323,6 @@ def test_lexer_format(input_string):
     scanner.scan_format()
 # 测试
 if __name__ == "__main__":
-    input_string =open("../go/token/scan.go",encoding="utf-8").read()
+    input_string =open("./go/main.go",encoding="utf-8").read()
     # test_lexer(input_string)
     test_lexer_format(input_string)
